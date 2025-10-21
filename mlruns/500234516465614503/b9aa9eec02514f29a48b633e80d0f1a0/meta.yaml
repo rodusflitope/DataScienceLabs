@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/potat/OneDrive/Escritorio/Lab_MDS/Lab8/mlruns/500234516465614503/b9aa9eec02514f29a48b633e80d0f1a0/artifacts
+end_time: 1760987956497
+entry_point_name: ''
+experiment_id: '500234516465614503'
+lifecycle_stage: active
+run_id: b9aa9eec02514f29a48b633e80d0f1a0
+run_name: XGBoost_trial_0_lr_0.111_depth_7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1760987941137
+status: 3
+tags: []
+user_id: potat

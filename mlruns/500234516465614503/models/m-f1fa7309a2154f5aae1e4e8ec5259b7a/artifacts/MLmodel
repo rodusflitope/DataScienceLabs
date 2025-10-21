@@ -1,0 +1,22 @@
+artifact_path: file:///C:/Users/potat/OneDrive/Escritorio/Lab_MDS/Lab8/mlruns/500234516465614503/models/m-f1fa7309a2154f5aae1e4e8ec5259b7a/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.12.3
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.1
+mlflow_version: 3.5.0
+model_id: m-f1fa7309a2154f5aae1e4e8ec5259b7a
+model_size_bytes: 756360
+model_uuid: m-f1fa7309a2154f5aae1e4e8ec5259b7a
+prompts: null
+run_id: f796baa4a1a7441c8c098b466c45cbc0
+utc_time_created: '2025-10-20 19:21:48.822394'

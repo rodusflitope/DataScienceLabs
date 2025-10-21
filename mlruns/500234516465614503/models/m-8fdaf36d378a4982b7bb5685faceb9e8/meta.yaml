@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/potat/OneDrive/Escritorio/Lab_MDS/Lab8/mlruns/500234516465614503/models/m-8fdaf36d378a4982b7bb5685faceb9e8/artifacts
+creation_timestamp: 1760988000009
+experiment_id: '500234516465614503'
+last_updated_timestamp: 1760988007767
+model_id: m-8fdaf36d378a4982b7bb5685faceb9e8
+model_type: null
+name: model
+source_run_id: 2a039ae2db5340f2ad9423257d9d000e
+status: 2
+status_message: null
