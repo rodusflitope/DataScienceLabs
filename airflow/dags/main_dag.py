@@ -147,7 +147,7 @@ def train_model_task(**context):
     with mlflow.start_run():
         model, best_params, metrics, run_id = retrain_pipeline(
             X_train, y_train, X_val, y_val, prep_pipeline,
-            use_optuna=True, n_trials=50, log_to_mlflow=True
+            use_optuna=True, n_trials=20, log_to_mlflow=True
         )
         
         feature_cols = [

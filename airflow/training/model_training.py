@@ -14,7 +14,7 @@ def calculate_scale_pos_weight(y_train):
     return scale_pos_weight
 
 
-def optimize_hyperparameters_optuna(X_train, y_train, X_val, y_val, n_trials=100):
+def optimize_hyperparameters_optuna(X_train, y_train, X_val, y_val, n_trials=20):
     scale_pos_weight = calculate_scale_pos_weight(y_train)
     
     def objective(trial):
@@ -121,7 +121,7 @@ def load_model_locally(filepath):
 
 
 def retrain_pipeline(X_train, y_train, X_val, y_val, prep_pipeline, 
-                     use_optuna=True, n_trials=100, log_to_mlflow=True):
+                     use_optuna=True, n_trials=20, log_to_mlflow=True):
     
     if use_optuna:
         best_params, best_pr_auc = optimize_hyperparameters_optuna(
