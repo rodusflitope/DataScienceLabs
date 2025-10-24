@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+lightgbm
+optuna
+mlflow
+shap
+scipy
+pyarrow
+apache-airflow
