@@ -3,3 +3,4 @@ data/
 mlruns/
 models/
 predictions/
+.env

@@ -17,7 +17,5 @@ if __name__ == "__main__":
     cutoff_date = max_date - pd.Timedelta(weeks=args.weeks)
     
     transacciones_old = transacciones[transacciones['purchase_date'] < cutoff_date].copy()
-    transacciones_new = transacciones[transacciones['purchase_date'] >= cutoff_date].copy()
     
-    transacciones_old.to_parquet(base_path / 'transacciones_backup.parquet', index=False)
-    transacciones_new.to_parquet(base_path / 'transacciones_new.parquet', index=False)
+    transacciones_old.to_parquet(base_path / 'transacciones_old_simulation.parquet', index=False)

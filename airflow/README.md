@@ -98,8 +98,8 @@ Después de cada entrenamiento, `reference_transacciones.pkl` se actualiza con l
 
 ### Simulación de nuevos datos
 
-Ejecutar `python airflow/simulate_new_data.py --weeks {cantidad de semanas}` para generar data con todas las semanas menos las últimas {cantidad de semanas} y después ejecutarlo de nuevo añádiendo
-esas últimas semanas. Con esto podemos correr el DAG con backup y después con new para simular nuevos datos.
+Ejecutar `python airflow/simulate_old_data.py --weeks {cantidad de semanas}` para generar data con todas las semanas menos las últimas {cantidad de semanas} y después ejecutarlo de nuevo añádiendo
+esas últimas semanas. Con esto podemos correr el DAG con `transacciones_old_simulation.parquet` y después con `transacciones.parquet` para simular nuevos datos.
 
 ---
 
@@ -132,5 +132,5 @@ airflow standalone
 1. **Datos consistentes**: Mismas columnas en todos los parquets nuevos que puedan aparecer
 2. **Drift solo numéricas**: Variables categóricas estables, es decir, no van a aparecer nuevas categorías.
 3. **Threshold 0.05**: 95% confianza estadística
-
+4. **Dataset completo en cada entrenamiento**: Se asume que los nuevos datos estarán agregados a los antiguos al momento de entrenar (datasets incrementales)
 ---
