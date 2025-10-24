@@ -1,5 +1,3 @@
-videos/
-
-*.txt
-
-!171.txt
+data/
+docker-img/
+mlruns/

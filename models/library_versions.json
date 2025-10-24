@@ -1,0 +1,9 @@
+{
+    "python": "3.12.3 | packaged by Anaconda, Inc. | (main, May  6 2024, 19:42:21) [MSC v.1916 64 bit (AMD64)]",
+    "numpy": "2.2.6",
+    "pandas": "2.3.2",
+    "scikit_learn": "1.7.1",
+    "xgboost": "3.0.5",
+    "mlflow": "3.5.0",
+    "optuna": "4.5.0"
+}
