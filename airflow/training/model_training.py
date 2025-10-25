@@ -1,9 +1,14 @@
 import joblib
 import mlflow
 import optuna
+import warnings
 from lightgbm import LGBMClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score
+
+# Suprimir warnings molestos
+warnings.filterwarnings('ignore', message='X does not have valid feature names')
+warnings.filterwarnings('ignore', category=FutureWarning)
 
 RANDOM_STATE = 10
 
@@ -83,7 +88,11 @@ def log_model_to_mlflow(model, prep_pipeline, params, metrics, model_name="lgbm_
             ('clf', model),
         ])
         
-        mlflow.sklearn.log_model(full_pipeline, model_name)
+        mlflow.sklearn.log_model(
+            full_pipeline, 
+            artifact_path=model_name,
+            signature=None  # Evita warning sobre signature
+        )
         run_id = mlflow.active_run().info.run_id
         
     return run_id

@@ -141,32 +141,27 @@ def train_model_task(**context):
     
     X_train, y_train = prepare_datasets(train_dataset, prep_pipeline, fit=True)
     X_val, y_val = prepare_datasets(val_dataset, prep_pipeline, fit=False)
-    
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    model, best_params, metrics, run_id = retrain_pipeline(
+        X_train, y_train, X_val, y_val, prep_pipeline,
+        use_optuna=True, n_trials=10, log_to_mlflow=True
+    )
     
-    with mlflow.start_run():
-        model, best_params, metrics, run_id = retrain_pipeline(
-            X_train, y_train, X_val, y_val, prep_pipeline,
-            use_optuna=True, n_trials=20, log_to_mlflow=True
-        )
-        
+    with mlflow.start_run(run_id=run_id):
         feature_cols = [
             'region_id', 'customer_type', 'brand', 'category', 'sub_category',
             'segment', 'package', 'size', 'num_deliver_per_week', 
             'num_visit_per_week', 'week'
         ]
-        X_sample = train_dataset[feature_cols].sample(min(500, len(train_dataset)))
+        X_sample = train_dataset[feature_cols].sample(min(200, len(train_dataset)))
         
         log_shap_to_mlflow(model, X_sample)
-    
     with open(f'{MODELS_PATH}/prep_pipeline.pkl', 'wb') as f:
         pickle.dump(prep_pipeline, f)
-    
     with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     with open(f'{MODELS_PATH}/reference_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
-    
     context['ti'].xcom_push(key='run_id', value=run_id)
     context['ti'].xcom_push(key='metrics', value=metrics)
 

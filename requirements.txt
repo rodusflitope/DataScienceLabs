@@ -8,3 +8,4 @@ shap
 scipy
 pyarrow
 apache-airflow
+python-dotenv
