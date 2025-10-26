@@ -3,3 +3,5 @@ uvicorn
 pydantic
 pandas
 scikit-learn
+lightgbm
+numpy

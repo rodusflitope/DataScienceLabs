@@ -7,6 +7,7 @@ import sys
 import os
 import pickle
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,23 @@ def train_model_task(**context):
     
     with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
+    
+    transacciones['purchase_date'] = pd.to_datetime(transacciones['purchase_date'])
+    fecha_inicio = transacciones['purchase_date'].min()
+    transacciones['week'] = ((transacciones['purchase_date'] - fecha_inicio).dt.days // 7).astype(int)
+    last_week = transacciones['week'].max()
+    next_week = last_week + 1
+    
+    metadata = {
+        'next_week': next_week,
+        'last_week': last_week,
+        'fecha_inicio': fecha_inicio,
+        'training_date': pd.Timestamp.now()
+    }
+    with open(MODELS_DIR / 'metadata.pkl', 'wb') as f:
+        pickle.dump(metadata, f)
+    logger.info(f"Metadata guardada: next_week={next_week}, last_week={last_week}")
+    
     with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
     logger.info("Datos de referencia actualizados para proxima deteccion de drift")

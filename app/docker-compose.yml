@@ -8,11 +8,14 @@ services:
       - "8000:8000"
     volumes:
       - ../airflow/storage/models:/app/models
+      - ../airflow/training:/app/training
+      - ../airflow/config.py:/app/config.py
     environment:
       - MODEL_PATH=/app/models/model.pkl
       - PREP_PIPELINE_PATH=/app/models/prep_pipeline.pkl
       - CLIENTES_PATH=/app/models/clean_clientes.pkl
       - PRODUCTOS_PATH=/app/models/clean_productos.pkl
+      - METADATA_PATH=/app/models/metadata.pkl
     networks:
       - app-network
 
