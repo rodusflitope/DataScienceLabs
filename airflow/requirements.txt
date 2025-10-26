@@ -3,9 +3,8 @@ numpy
 scikit-learn
 lightgbm
 optuna
-mlflow
+mlflow==2.14.1
 shap
 scipy
 pyarrow
-apache-airflow
 python-dotenv

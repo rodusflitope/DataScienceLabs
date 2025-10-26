@@ -4,3 +4,8 @@ mlruns/
 models/
 predictions/
 .env
+airflow-webserver.pid
+airflow.cfg
+webserver_config.py
+logs/
+mlflow.db

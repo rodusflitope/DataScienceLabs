@@ -105,7 +105,45 @@ esas últimas semanas. Con esto podemos correr el DAG con `transacciones_old_sim
 
 ## Ejecución
 
-### Setup en WSL (Windows)
+### Opción A (recomendada): Docker en Windows
+
+Requiere Docker Desktop.
+
+1) Ir a esta carpeta y construir/levantar el stack:
+
+```powershell
+# Desde PowerShell
+cd "c:\Users\potat\OneDrive\Escritorio\Lab_MDS\Proyecto 2\airflow"
+docker compose build
+docker compose up airflow-init
+docker compose up -d
+```
+
+2) Accesos:
+
+- Airflow UI: http://localhost:8080 (usuario: admin, clave: admin)
+- MLflow UI: http://localhost:5000
+
+3) Ubicaciones dentro del contenedor (configuradas por variables de entorno):
+
+- Datos: `/opt/airflow/data`
+- Modelos: `/opt/airflow/storage/models`
+- Predicciones: `/opt/airflow/storage/predictions`
+- MLflow Tracking URI: `http://mlflow:5000`
+
+Coloca tus `clientes.parquet`, `productos.parquet`, `transacciones.parquet` en `Proyecto 2/airflow/data` en tu host; estarán disponibles dentro del contenedor en `/opt/airflow/data`.
+
+4) Ejecutar el DAG desde la UI de Airflow (ml_pipeline) y verificar artefactos y métricas en MLflow.
+
+Para apagar:
+
+```powershell
+docker compose down
+```
+
+---
+
+### Opción B: Setup en WSL (Windows)
 
 ```bash
 pip3 install -r requirements.txt

@@ -1,7 +1,8 @@
 from airflow import DAG
-from airflow.providers.standard.operators.python import PythonOperator, BranchPythonOperator
-from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.operators.empty import EmptyOperator
 from datetime import datetime
+from pathlib import Path
 import sys
 import os
 import pickle
@@ -17,6 +18,7 @@ from config import (
     CLIENTES_FILENAME,
     PRODUCTOS_FILENAME,
     TRANSACCIONES_FILENAME,
+    OPTUNA_N_TRIALS,
 )
 from training.data_processing import (
     load_data, clean_data, split_temporal_data,
@@ -28,11 +30,12 @@ from training.prediction import generate_predictions_for_next_week
 from training.interpretability import log_shap_to_mlflow
 import mlflow
 
-args = {
-    'owner': 'airflow',
-    'retries': 1
-}
-mlflow.set_tracking_uri(f"file:///{MLFLOW_TRACKING_URI}")
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+MODELS_DIR = Path(MODELS_PATH)
+PREDICTIONS_DIR = Path(PREDICTIONS_PATH)
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 def extract_data_task(**context):
     print("Extrayendo datos")
@@ -43,43 +46,43 @@ def extract_data_task(**context):
         TRANSACCIONES_FILENAME,
     )
     
-    with open(f'{MODELS_PATH}/raw_clientes.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'raw_clientes.pkl', 'wb') as f:
         pickle.dump(clientes, f)
-    with open(f'{MODELS_PATH}/raw_productos.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'raw_productos.pkl', 'wb') as f:
         pickle.dump(productos, f)
-    with open(f'{MODELS_PATH}/raw_transacciones.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'raw_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
 
 def clean_data_task(**context):
-    with open(f'{MODELS_PATH}/raw_clientes.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'raw_clientes.pkl', 'rb') as f:
         clientes = pickle.load(f)
-    with open(f'{MODELS_PATH}/raw_productos.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'raw_productos.pkl', 'rb') as f:
         productos = pickle.load(f)
-    with open(f'{MODELS_PATH}/raw_transacciones.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'raw_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     
     clientes_clean, productos_clean, transacciones_clean = clean_data(
         clientes, productos, transacciones
     )
     
-    with open(f'{MODELS_PATH}/clean_clientes.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'clean_clientes.pkl', 'wb') as f:
         pickle.dump(clientes_clean, f)
-    with open(f'{MODELS_PATH}/clean_productos.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'clean_productos.pkl', 'wb') as f:
         pickle.dump(productos_clean, f)
-    with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'clean_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones_clean, f)
 
 def detect_drift_task(**context):
-    with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         new_transacciones = pickle.load(f)
     
-    if os.path.exists(f'{MODELS_PATH}/reference_transacciones.pkl'):
-        with open(f'{MODELS_PATH}/reference_transacciones.pkl', 'rb') as f:
+    if os.path.exists(MODELS_DIR / 'reference_transacciones.pkl'):
+        with open(MODELS_DIR / 'reference_transacciones.pkl', 'rb') as f:
             reference_transacciones = pickle.load(f)
         
-        with open(f'{MODELS_PATH}/clean_clientes.pkl', 'rb') as f:
+        with open(MODELS_DIR / 'clean_clientes.pkl', 'rb') as f:
             clientes = pickle.load(f)
-        with open(f'{MODELS_PATH}/clean_productos.pkl', 'rb') as f:
+        with open(MODELS_DIR / 'clean_productos.pkl', 'rb') as f:
             productos = pickle.load(f)
         
         ref_merged = reference_transacciones.merge(clientes, on='customer_id', how='left')
@@ -101,11 +104,11 @@ def detect_drift_task(**context):
         return 'build_weekly_dataset'
 
 def build_weekly_dataset_task(**context):
-    with open(f'{MODELS_PATH}/clean_clientes.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_clientes.pkl', 'rb') as f:
         clientes = pickle.load(f)
-    with open(f'{MODELS_PATH}/clean_productos.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_productos.pkl', 'rb') as f:
         productos = pickle.load(f)
-    with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     
     train_trans, val_trans, test_trans = split_temporal_data(
@@ -126,15 +129,15 @@ def build_weekly_dataset_task(**context):
         'productos': productos
     })
     
-    with open(f'{MODELS_PATH}/train_dataset.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'train_dataset.pkl', 'wb') as f:
         pickle.dump(train_dataset, f)
-    with open(f'{MODELS_PATH}/val_dataset.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'val_dataset.pkl', 'wb') as f:
         pickle.dump(val_dataset, f)
 
 def train_model_task(**context):
-    with open(f'{MODELS_PATH}/train_dataset.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'train_dataset.pkl', 'rb') as f:
         train_dataset = pickle.load(f)
-    with open(f'{MODELS_PATH}/val_dataset.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'val_dataset.pkl', 'rb') as f:
         val_dataset = pickle.load(f)
     
     prep_pipeline = build_preprocessing_pipeline()
@@ -144,7 +147,7 @@ def train_model_task(**context):
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     model, best_params, metrics, run_id = retrain_pipeline(
         X_train, y_train, X_val, y_val, prep_pipeline,
-        use_optuna=True, n_trials=10, log_to_mlflow=True
+        use_optuna=True, n_trials=OPTUNA_N_TRIALS, log_to_mlflow=True
     )
     
     with mlflow.start_run(run_id=run_id):
@@ -156,21 +159,21 @@ def train_model_task(**context):
         X_sample = train_dataset[feature_cols].sample(min(200, len(train_dataset)))
         
         log_shap_to_mlflow(model, X_sample)
-    with open(f'{MODELS_PATH}/prep_pipeline.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'prep_pipeline.pkl', 'wb') as f:
         pickle.dump(prep_pipeline, f)
-    with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
-    with open(f'{MODELS_PATH}/reference_transacciones.pkl', 'wb') as f:
+    with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
     context['ti'].xcom_push(key='run_id', value=run_id)
     context['ti'].xcom_push(key='metrics', value=metrics)
 
 def generate_predictions_task(**context):
-    with open(f'{MODELS_PATH}/clean_clientes.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_clientes.pkl', 'rb') as f:
         clientes = pickle.load(f)
-    with open(f'{MODELS_PATH}/clean_productos.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_productos.pkl', 'rb') as f:
         productos = pickle.load(f)
-    with open(f'{MODELS_PATH}/clean_transacciones.pkl', 'rb') as f:
+    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -193,16 +196,14 @@ def generate_predictions_task(**context):
         full_pipeline, prep_pipeline=None
     )
     
-    predictions_file = f'{PREDICTIONS_PATH}/predictions_next_week.parquet'
+    predictions_file = PREDICTIONS_DIR / 'predictions_next_week.parquet'
     predictions.to_parquet(predictions_file, index=False)
     
-    context['ti'].xcom_push(key='predictions_file', value=predictions_file)
+    context['ti'].xcom_push(key='predictions_file', value=str(predictions_file))
     context['ti'].xcom_push(key='n_predictions', value=len(predictions))
 
 with DAG(
     dag_id='ml_pipeline',
-    default_args=args,
-    description='Pipeline ML con detección de drift y reentrenamiento',
     start_date=datetime(2024, 1, 1),
     schedule=None) as dag:
 

@@ -1,0 +1,57 @@
+x-airflow-common: &airflow-common
+  build:
+    context: ..
+    dockerfile: airflow/Dockerfile
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+    ML_PIPELINE_DATA_PATH: /opt/airflow/data
+    ML_PIPELINE_MODELS_PATH: /opt/airflow/storage/models
+    ML_PIPELINE_PREDICTIONS_PATH: /opt/airflow/storage/predictions
+
+    ML_PIPELINE_MLFLOW_TRACKING_URI: http://mlflow:5000
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+  volumes:
+    - .:/opt/airflow
+  depends_on:
+    - postgres
+    - mlflow
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.14.1
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri file:///opt/airflow/mlruns
+      --default-artifact-root file:///opt/airflow/mlruns
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/opt/airflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command: -c "airflow db migrate && airflow users create --role Admin --username admin --password admin --firstname admin --lastname admin --email admin@example.com"
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
