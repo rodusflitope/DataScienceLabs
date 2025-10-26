@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: sodai-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../airflow/storage/models:/app/models
+    environment:
+      - MODEL_PATH=/app/models/model.pkl
+      - PREP_PIPELINE_PATH=/app/models/prep_pipeline.pkl
+      - CLIENTES_PATH=/app/models/clean_clientes.pkl
+      - PRODUCTOS_PATH=/app/models/clean_productos.pkl
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    container_name: sodai-frontend
+    ports:
+      - "7860:7860"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
