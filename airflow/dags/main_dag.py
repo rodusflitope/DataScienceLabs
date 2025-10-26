@@ -34,8 +34,16 @@ PREDICTIONS_DIR = Path(PREDICTIONS_PATH)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
+logger.info(f"Configuracion cargada - MODELS_PATH: {MODELS_PATH}, PREDICTIONS_PATH: {PREDICTIONS_PATH}")
+logger.info(f"DATA_PATH desde config: {DATA_PATH}")
+logger.info(f"OPTUNA_N_TRIALS: {OPTUNA_N_TRIALS}")
+
 def extract_data_task(**context):
     logger.info("Iniciando extraccion de datos")
+    logger.info(f"DATA_PATH: {DATA_PATH}")
+    logger.info(f"CLIENTES_FILENAME: {CLIENTES_FILENAME}")
+    logger.info(f"PRODUCTOS_FILENAME: {PRODUCTOS_FILENAME}")
+    logger.info(f"TRANSACCIONES_FILENAME: {TRANSACCIONES_FILENAME}")
     clientes, productos, transacciones = load_data(
         DATA_PATH,
         CLIENTES_FILENAME,
@@ -165,7 +173,7 @@ def train_model_task(**context):
     X_train, y_train = prepare_datasets(train_dataset, prep_pipeline, fit=True)
     X_val, y_val = prepare_datasets(val_dataset, prep_pipeline, fit=False)
     logger.info(f"Datos preparados: X_train shape {X_train.shape}, X_val shape {X_val.shape}")
-    
+    logger.info(f"Iniciando reentrenamiento del modelo con Optuna con {OPTUNA_N_TRIALS} trials")
     model, best_params, metrics = retrain_pipeline(
         X_train, y_train, X_val, y_val, prep_pipeline,
         use_optuna=True, n_trials=OPTUNA_N_TRIALS, log_to_mlflow=False
