@@ -1,5 +1,4 @@
 import pandas as pd
-import mlflow
 
 def generate_predictions_for_next_week(clientes, productos, transacciones, 
                                        model, prep_pipeline=None, 
@@ -49,27 +48,14 @@ def generate_predictions_for_next_week(clientes, productos, transacciones,
     return prediction_data
 
 
-def load_model_and_predict(clientes, produtos, transacciones, 
-                          experiment_name="customer_product_prediction"):
+def load_model_and_predict(clientes, produtos, transacciones, model_path):
+    import joblib
     
-    mlflow.set_experiment(experiment_name)
-    
-    runs = mlflow.search_runs(
-        experiment_names=[experiment_name],
-        order_by=["metrics.pr_auc DESC"],
-        max_results=1
-    )
-    
-    if len(runs) == 0:
-        raise ValueError(f"No runs found in experiment {experiment_name}")
-    
-    best_run_id = runs.iloc[0]['run_id']
-    model_uri = f"runs:/{best_run_id}/lgbm_model"
-    full_pipeline = mlflow.sklearn.load_model(model_uri)
+    full_pipeline = joblib.load(model_path)
     
     predictions = generate_predictions_for_next_week(
         clientes, produtos, transacciones, 
         full_pipeline, prep_pipeline=None
     )
     
-    return predictions, best_run_id
+    return predictions

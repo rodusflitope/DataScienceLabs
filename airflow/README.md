@@ -1,4 +1,4 @@
-# Pipeline ML con Airflow, MLflow y Optuna
+# Pipeline ML con Airflow y Optuna
 
 Pipeline automatizado para predecir compras cliente-producto en la siguiente semana, con detección de drift y reentrenamiento condicional.
 
@@ -11,7 +11,7 @@ airflow/
 ├── dags/main_dag.py       # DAG principal
 ├── training/
 │   ├── data_processing.py        # Limpieza y transformación
-│   ├── model_training.py         # Entrenamiento con Optuna + MLflow
+│   ├── model_training.py         # Entrenamiento con Optuna
 │   ├── drift_detection.py        # Detección drift (KS test)
 │   ├── prediction.py             # Generación predicciones
 │   └── interpretability.py       # Gráficos SHAP
@@ -57,15 +57,14 @@ Construye dataset semanal con:
 1. Preprocessing (OneHot + StandardScaler + cyclical weeks)
 2. Optimización Optuna
 3. Entrenamiento LightGBM
-4. Logging MLflow (params, métricas, modelo)
-5. SHAP
-6. Actualiza referencia para próximo drift
+4. Guardado de modelo y pipeline localmente (pickle)
+5. Actualiza referencia para próximo drift
 
 ### 7. `join_paths`
 Une ramas condicionales (`trigger_rule='none_failed_min_one_success'`).
 , es decir, se ejecuta si ninguna fallo y alguna salió bien
 ### 8. `generate_predictions`
-Carga mejor modelo MLflow y predice semana `max + 1`. Output: `predictions_next_week.parquet`.
+Carga modelo guardado localmente (pickle) y predice semana `max + 1`. Output: `predictions_next_week.parquet`.
 
 ---
 
@@ -121,19 +120,17 @@ docker compose up -d
 
 2) Accesos:
 
-- Airflow UI: http://localhost:8080 (usuario: admin, clave: admin)
-- MLflow UI: http://localhost:5000
+- Airflow UI: <http://localhost:8080> (usuario: admin, clave: admin)
 
 3) Ubicaciones dentro del contenedor (configuradas por variables de entorno):
 
 - Datos: `/opt/airflow/data`
 - Modelos: `/opt/airflow/storage/models`
 - Predicciones: `/opt/airflow/storage/predictions`
-- MLflow Tracking URI: `http://mlflow:5000`
 
 Coloca tus `clientes.parquet`, `productos.parquet`, `transacciones.parquet` en `Proyecto 2/airflow/data` en tu host; estarán disponibles dentro del contenedor en `/opt/airflow/data`.
 
-4) Ejecutar el DAG desde la UI de Airflow (ml_pipeline) y verificar artefactos y métricas en MLflow.
+4) Ejecutar el DAG desde la UI de Airflow (ml_pipeline).
 
 Para apagar:
 

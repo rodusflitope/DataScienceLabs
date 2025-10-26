@@ -1,5 +1,4 @@
 import joblib
-import mlflow
 import optuna
 import warnings
 from lightgbm import LGBMClassifier
@@ -78,45 +77,6 @@ def evaluate_model(model, X_val, y_val):
     return metrics
 
 
-def log_model_to_mlflow(model, prep_pipeline, params, metrics, model_name="lgbm_model"):
-    with mlflow.start_run():
-        mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
-        
-        full_pipeline = Pipeline(steps=[
-            ('prep', prep_pipeline),
-            ('clf', model),
-        ])
-        
-        mlflow.sklearn.log_model(
-            full_pipeline, 
-            artifact_path=model_name,
-            signature=None  # Evita warning sobre signature
-        )
-        run_id = mlflow.active_run().info.run_id
-        
-    return run_id
-
-
-def load_best_model_from_mlflow(experiment_name="Default"):
-    mlflow.set_experiment(experiment_name)
-    
-    runs = mlflow.search_runs(
-        experiment_names=[experiment_name],
-        order_by=["metrics.pr_auc DESC"],
-        max_results=1
-    )
-    
-    if len(runs) == 0:
-        return None
-    
-    best_run_id = runs.iloc[0]['run_id']
-    model_uri = f"runs:/{best_run_id}/lgbm_model"
-    model = mlflow.sklearn.load_model(model_uri)
-    
-    return model, best_run_id
-
-
 def save_model_locally(model, prep_pipeline, filepath):
     full_pipeline = Pipeline(steps=[
         ('prep', prep_pipeline),
@@ -130,7 +90,7 @@ def load_model_locally(filepath):
 
 
 def retrain_pipeline(X_train, y_train, X_val, y_val, prep_pipeline, 
-                     use_optuna=True, n_trials=20, log_to_mlflow=True):
+                     use_optuna=True, n_trials=20, log_to_mlflow=False):
     
     if use_optuna:
         best_params, best_pr_auc = optimize_hyperparameters_optuna(
@@ -147,8 +107,4 @@ def retrain_pipeline(X_train, y_train, X_val, y_val, prep_pipeline,
     model = train_lgbm_model(X_train, y_train, best_params)
     metrics = evaluate_model(model, X_val, y_val)
     
-    if log_to_mlflow:
-        run_id = log_model_to_mlflow(model, prep_pipeline, best_params, metrics)
-        return model, best_params, metrics, run_id
-    
-    return model, best_params, metrics, None
+    return model, best_params, metrics

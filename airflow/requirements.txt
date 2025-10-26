@@ -3,7 +3,6 @@ numpy
 scikit-learn
 lightgbm
 optuna
-mlflow==2.14.1
 shap
 scipy
 pyarrow

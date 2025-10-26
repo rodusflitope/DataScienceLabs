@@ -9,14 +9,10 @@ x-airflow-common: &airflow-common
     ML_PIPELINE_DATA_PATH: /opt/airflow/data
     ML_PIPELINE_MODELS_PATH: /opt/airflow/storage/models
     ML_PIPELINE_PREDICTIONS_PATH: /opt/airflow/storage/predictions
-
-    ML_PIPELINE_MLFLOW_TRACKING_URI: http://mlflow:5000
-    MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
     - .:/opt/airflow
   depends_on:
     - postgres
-    - mlflow
 
 services:
   postgres:
@@ -25,21 +21,6 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
-
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.14.1
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri file:///opt/airflow/mlruns
-      --default-artifact-root file:///opt/airflow/mlruns
-    ports:
-      - "5000:5000"
-    volumes:
-      - .:/opt/airflow
-    environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
 
   airflow-init:
     <<: *airflow-common

@@ -13,8 +13,6 @@ from config import (
     DATA_PATH,
     MODELS_PATH,
     PREDICTIONS_PATH,
-    MLFLOW_TRACKING_URI,
-    MLFLOW_EXPERIMENT_NAME,
     CLIENTES_FILENAME,
     PRODUCTOS_FILENAME,
     TRANSACCIONES_FILENAME,
@@ -27,10 +25,6 @@ from training.data_processing import (
 from training.model_training import retrain_pipeline
 from training.drift_detection import detect_drift_in_transactions
 from training.prediction import generate_predictions_for_next_week
-from training.interpretability import log_shap_to_mlflow
-import mlflow
-
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 MODELS_DIR = Path(MODELS_PATH)
 PREDICTIONS_DIR = Path(PREDICTIONS_PATH)
@@ -144,28 +138,22 @@ def train_model_task(**context):
     
     X_train, y_train = prepare_datasets(train_dataset, prep_pipeline, fit=True)
     X_val, y_val = prepare_datasets(val_dataset, prep_pipeline, fit=False)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-    model, best_params, metrics, run_id = retrain_pipeline(
+    
+    model, best_params, metrics = retrain_pipeline(
         X_train, y_train, X_val, y_val, prep_pipeline,
-        use_optuna=True, n_trials=OPTUNA_N_TRIALS, log_to_mlflow=True
+        use_optuna=True, n_trials=OPTUNA_N_TRIALS, log_to_mlflow=False
     )
     
-    with mlflow.start_run(run_id=run_id):
-        feature_cols = [
-            'region_id', 'customer_type', 'brand', 'category', 'sub_category',
-            'segment', 'package', 'size', 'num_deliver_per_week', 
-            'num_visit_per_week', 'week'
-        ]
-        X_sample = train_dataset[feature_cols].sample(min(200, len(train_dataset)))
-        
-        log_shap_to_mlflow(model, X_sample)
     with open(MODELS_DIR / 'prep_pipeline.pkl', 'wb') as f:
         pickle.dump(prep_pipeline, f)
+    with open(MODELS_DIR / 'model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+    
     with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
-    context['ti'].xcom_push(key='run_id', value=run_id)
+    
     context['ti'].xcom_push(key='metrics', value=metrics)
 
 def generate_predictions_task(**context):
@@ -176,20 +164,17 @@ def generate_predictions_task(**context):
     with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     
-    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    # Cargar modelo desde archivo local
+    with open(MODELS_DIR / 'model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    with open(MODELS_DIR / 'prep_pipeline.pkl', 'rb') as f:
+        prep_pipeline = pickle.load(f)
     
-    runs = mlflow.search_runs(
-        experiment_names=[MLFLOW_EXPERIMENT_NAME],
-        order_by=["metrics.pr_auc DESC"],
-        max_results=1
-    )
-    
-    if len(runs) == 0:
-        raise ValueError(f"No runs found in experiment {MLFLOW_EXPERIMENT_NAME}")
-    
-    best_run_id = runs.iloc[0]['run_id']
-    model_uri = f"runs:/{best_run_id}/lgbm_model"
-    full_pipeline = mlflow.sklearn.load_model(model_uri)
+    from sklearn.pipeline import Pipeline
+    full_pipeline = Pipeline(steps=[
+        ('prep', prep_pipeline),
+        ('clf', model),
+    ])
     
     predictions = generate_predictions_for_next_week(
         clientes, productos, transacciones, 
