@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../airflow/storage/models:/app/models
+      - ../airflow/training:/app/training
+      - ../airflow/config.py:/app/config.py
+    environment:
+      - MODEL_PATH=/app/models/model.pkl
+      - PREP_PIPELINE_PATH=/app/models/prep_pipeline.pkl
+      - CLIENTES_PATH=/app/models/clean_clientes.pkl
+      - PRODUCTOS_PATH=/app/models/clean_productos.pkl
+      - TRANSACCIONES_PATH=/app/models/clean_transacciones.pkl
+    networks:
+      - recsys-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "7861:7861"
+    environment:
+      - BACKEND_URL=http://backend:8001
+    depends_on:
+      - backend
+    networks:
+      - recsys-network
+
+networks:
+  recsys-network:
+    driver: bridge
