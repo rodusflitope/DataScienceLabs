@@ -50,7 +50,7 @@ class WeeklyDatasetBuilder(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
 
-    def transform(self, X):
+    def transform(self, X, y=None):
         """
         X debe ser un dict con keys: 'transacciones', 'clientes', 'productos'
         """
@@ -93,23 +93,27 @@ class WeeklyDatasetBuilder(BaseEstimator, TransformerMixin):
         casos_positivos = dataset_completo[dataset_completo['purchased'] == 1]
         casos_negativos = dataset_completo[dataset_completo['purchased'] == 0]
 
-        negativos_sample = []
-        for cliente in clientes_activos:
-            neg_cliente = casos_negativos[casos_negativos['customer_id'] == cliente]
-            pos_cliente = casos_positivos[casos_positivos['customer_id'] == cliente]
-            
-            # Samplear negativos en proporción a positivos
-            n_sample = min(len(pos_cliente) * self.ratio_neg_pos, len(neg_cliente))
-            if n_sample > 0:
-                neg_sample = neg_cliente.sample(n=int(n_sample), random_state=self.random_state)
-                negativos_sample.append(neg_sample)
-
-        # Combinar positivos y negativos
-        if len(negativos_sample) > 0:
-            casos_negativos_sample = pd.concat(negativos_sample, ignore_index=True)
-            dataset_completo = pd.concat([casos_positivos, casos_negativos_sample], ignore_index=True)
+        # Si ratio_neg_pos es None o -1, usamos todos los negativos (sin sampling)
+        if self.ratio_neg_pos is None or self.ratio_neg_pos < 0:
+            dataset_completo = pd.concat([casos_positivos, casos_negativos], ignore_index=True)
         else:
-            dataset_completo = casos_positivos.copy()
+            negativos_sample = []
+            for cliente in clientes_activos:
+                neg_cliente = casos_negativos[casos_negativos['customer_id'] == cliente]
+                pos_cliente = casos_positivos[casos_positivos['customer_id'] == cliente]
+                
+                # Samplear negativos en proporción a positivos
+                n_sample = min(len(pos_cliente) * self.ratio_neg_pos, len(neg_cliente))
+                if n_sample > 0:
+                    neg_sample = neg_cliente.sample(n=int(n_sample), random_state=self.random_state)
+                    negativos_sample.append(neg_sample)
+
+            # Combinar positivos y negativos
+            if len(negativos_sample) > 0:
+                casos_negativos_sample = pd.concat(negativos_sample, ignore_index=True)
+                dataset_completo = pd.concat([casos_positivos, casos_negativos_sample], ignore_index=True)
+            else:
+                dataset_completo = casos_positivos.copy()
 
         # Merge con datos de clientes y productos
         dataset_final = (
@@ -117,6 +121,16 @@ class WeeklyDatasetBuilder(BaseEstimator, TransformerMixin):
             .merge(clientes, on='customer_id', how='left')
             .merge(productos, on='product_id', how='left')
         )
+
+        # Merge con frecuencia historica si esta disponible
+        if 'frequency_df' in X:
+            frequency_df = X['frequency_df']
+            dataset_final = dataset_final.merge(
+                frequency_df, 
+                on=['customer_id', 'product_id'], 
+                how='left'
+            )
+            dataset_final['purchase_frequency'] = dataset_final['purchase_frequency'].fillna(0)
 
         # Eliminar columna 'count' si existe
         if 'count' in dataset_final.columns:
@@ -149,6 +163,7 @@ def build_preprocessing_pipeline():
         'size',
         'num_deliver_per_week',
         'num_visit_per_week',
+        'purchase_frequency', # Nueva feature
     ]
     
     # Después de add_week_cyclical, tendremos week_sin y week_cos
@@ -180,7 +195,7 @@ def prepare_datasets(dataset_final, prep_pipeline, fit=True):
     feature_cols = [
         'region_id', 'customer_type', 'brand', 'category', 'sub_category',
         'segment', 'package', 'size', 'num_deliver_per_week', 
-        'num_visit_per_week', 'week'
+        'num_visit_per_week', 'week', 'purchase_frequency' # Nueva feature
     ]
     
     X = dataset_final[feature_cols]

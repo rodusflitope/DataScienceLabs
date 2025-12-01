@@ -21,6 +21,7 @@ from config import (
     PRODUCTOS_FILENAME,
     TRANSACCIONES_FILENAME,
     OPTUNA_N_TRIALS,
+    TOP_K_PREDICTIONS,
 )
 from training.data_processing import (
     load_data, clean_data, split_temporal_data,
@@ -138,19 +139,37 @@ def build_weekly_dataset_task(**context):
     )
     logger.info(f"Datos divididos: {len(train_trans)} train, {len(val_trans)} val, {len(test_trans)} test")
     
-    builder = WeeklyDatasetBuilder()
     
-    train_dataset = builder.transform({
+    frequency_df_train = (
+        train_trans.groupby(['customer_id', 'product_id'])
+        .size()
+        .reset_index(name='purchase_frequency')
+    )
+    
+    frequency_df_val = (
+        pd.concat([train_trans, val_trans]).groupby(['customer_id', 'product_id'])
+        .size()
+        .reset_index(name='purchase_frequency')
+    )
+    
+    builder_train = WeeklyDatasetBuilder(ratio_neg_pos=2)
+    
+    train_dataset = builder_train.transform({
         'transacciones': train_trans,
         'clientes': clientes,
-        'productos': productos
+        'productos': productos,
+        'frequency_df': frequency_df_train
     })
     logger.info(f"Dataset de entrenamiento construido: {len(train_dataset)} registros")
     
-    val_dataset = builder.transform({
+
+    builder_val = WeeklyDatasetBuilder(ratio_neg_pos=-1)
+    
+    val_dataset = builder_val.transform({
         'transacciones': val_trans,
         'clientes': clientes,
-        'productos': productos
+        'productos': productos,
+        'frequency_df': frequency_df_val
     })
     logger.info(f"Dataset de validacion construido: {len(val_dataset)} registros")
     
@@ -158,7 +177,15 @@ def build_weekly_dataset_task(**context):
         pickle.dump(train_dataset, f)
     with open(MODELS_DIR / 'val_dataset.pkl', 'wb') as f:
         pickle.dump(val_dataset, f)
-    logger.info("Datasets guardados")
+
+    frequency_df_global = (
+        transacciones.groupby(['customer_id', 'product_id'])
+        .size()
+        .reset_index(name='purchase_frequency')
+    )
+    with open(MODELS_DIR / 'frequency_df.pkl', 'wb') as f:
+        pickle.dump(frequency_df_global, f)
+    logger.info("Datasets y frequency_df guardados")
 
 def train_model_task(**context):
     logger.info("Iniciando entrenamiento del modelo")
@@ -201,11 +228,12 @@ def train_model_task(**context):
         'next_week': next_week,
         'last_week': last_week,
         'fecha_inicio': fecha_inicio,
-        'training_date': pd.Timestamp.now()
+        'training_date': pd.Timestamp.now(),
+        'threshold': metrics.get('threshold', 0.5)
     }
     with open(MODELS_DIR / 'metadata.pkl', 'wb') as f:
         pickle.dump(metadata, f)
-    logger.info(f"Metadata guardada: next_week={next_week}, last_week={last_week}")
+    logger.info(f"Metadata guardada: next_week={next_week}, last_week={last_week}, threshold={metadata['threshold']}")
     
     with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
         pickle.dump(transacciones, f)
@@ -228,6 +256,21 @@ def generate_predictions_task(**context):
         model = pickle.load(f)
     with open(MODELS_DIR / 'prep_pipeline.pkl', 'rb') as f:
         prep_pipeline = pickle.load(f)
+    
+    # Cargar metadata para obtener threshold
+    threshold = 0.5
+    if (MODELS_DIR / 'metadata.pkl').exists():
+        with open(MODELS_DIR / 'metadata.pkl', 'rb') as f:
+            metadata = pickle.load(f)
+            threshold = metadata.get('threshold', 0.5)
+            logger.info(f"Usando threshold optimizado: {threshold}")
+    
+    frequency_df = None
+    if (MODELS_DIR / 'frequency_df.pkl').exists():
+        with open(MODELS_DIR / 'frequency_df.pkl', 'rb') as f:
+            frequency_df = pickle.load(f)
+            logger.info("Frequency DF cargado")
+    
     logger.info("Modelo y pipeline cargados")
     
     from sklearn.pipeline import Pipeline
@@ -238,13 +281,20 @@ def generate_predictions_task(**context):
     
     predictions = generate_predictions_for_next_week(
         clientes, productos, transacciones, 
-        full_pipeline, prep_pipeline=None
+        full_pipeline, prep_pipeline=None,
+        threshold=threshold,
+        top_k=TOP_K_PREDICTIONS,
+        frequency_df=frequency_df
     )
     logger.info(f"Predicciones generadas: {len(predictions)} registros")
     
-    predictions_file = PREDICTIONS_DIR / 'predictions_next_week.parquet'
-    predictions.to_parquet(predictions_file, index=False)
-    logger.info(f"Predicciones guardadas en: {predictions_file}")
+    if not predictions.empty:
+        logger.info(f"Semana predicha: {predictions['week'].unique()}")
+    
+    predictions_file = PREDICTIONS_DIR / 'predictions_next_week.csv'
+    # Guardar solo customer_id y product_id
+    predictions[['customer_id', 'product_id']].to_csv(predictions_file, index=False, header=False)
+    logger.info(f"Predicciones guardadas en: {predictions_file} (formato: customer_id, product_id)")
     
     context['ti'].xcom_push(key='predictions_file', value=str(predictions_file))
     context['ti'].xcom_push(key='n_predictions', value=len(predictions))
