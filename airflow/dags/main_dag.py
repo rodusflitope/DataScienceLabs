@@ -110,6 +110,12 @@ def detect_drift_task(**context):
         
         drift_detected = detect_drift_in_transactions(ref_merged, new_merged, threshold=0.05)
         logger.info(f"Resultado deteccion de drift: {drift_detected}")
+
+        logger.info("Actualizando datos de referencia con nuevos datos (acumulacion historica)")
+        full_transacciones = pd.concat([reference_transacciones, new_transacciones]).drop_duplicates().reset_index(drop=True)
+        with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
+            pickle.dump(full_transacciones, f)
+        logger.info(f"Datos de referencia actualizados. Total registros: {len(full_transacciones)}")
         
         context['ti'].xcom_push(key='drift_detected', value=drift_detected)
         
@@ -121,6 +127,10 @@ def detect_drift_task(**context):
             return 'skip_training'
     else:
         logger.info("No hay datos de referencia, se procedera con entrenamiento inicial")
+
+        with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
+            pickle.dump(new_transacciones, f)
+            
         context['ti'].xcom_push(key='drift_detected', value=True)
         return 'build_weekly_dataset'
 
@@ -130,9 +140,10 @@ def build_weekly_dataset_task(**context):
         clientes = pickle.load(f)
     with open(MODELS_DIR / 'clean_productos.pkl', 'rb') as f:
         productos = pickle.load(f)
-    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
+
+    with open(MODELS_DIR / 'reference_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
-    logger.info(f"Datos cargados para construccion de dataset")
+    logger.info(f"Datos cargados para construccion de dataset (usando historico completo: {len(transacciones)} registros)")
     
     train_trans, val_trans, test_trans = split_temporal_data(
         transacciones, train_ratio=0.70, val_ratio=0.15
@@ -215,7 +226,8 @@ def train_model_task(**context):
         pickle.dump(model, f)
     logger.info("Modelo y pipeline guardados")
     
-    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
+    # Usar reference_transacciones para calcular metadatos globales
+    with open(MODELS_DIR / 'reference_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     
     transacciones['purchase_date'] = pd.to_datetime(transacciones['purchase_date'])
@@ -235,10 +247,6 @@ def train_model_task(**context):
         pickle.dump(metadata, f)
     logger.info(f"Metadata guardada: next_week={next_week}, last_week={last_week}, threshold={metadata['threshold']}")
     
-    with open(MODELS_DIR / 'reference_transacciones.pkl', 'wb') as f:
-        pickle.dump(transacciones, f)
-    logger.info("Datos de referencia actualizados para proxima deteccion de drift")
-    
     context['ti'].xcom_push(key='metrics', value=metrics)
 
 def generate_predictions_task(**context):
@@ -247,7 +255,8 @@ def generate_predictions_task(**context):
         clientes = pickle.load(f)
     with open(MODELS_DIR / 'clean_productos.pkl', 'rb') as f:
         productos = pickle.load(f)
-    with open(MODELS_DIR / 'clean_transacciones.pkl', 'rb') as f:
+    # Usar reference_transacciones para tener contexto completo al predecir
+    with open(MODELS_DIR / 'reference_transacciones.pkl', 'rb') as f:
         transacciones = pickle.load(f)
     logger.info("Datos cargados para predicciones")
     
