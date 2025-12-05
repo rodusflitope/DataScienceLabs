@@ -1,8 +1,5 @@
 __pycache__/
-data/
 mlruns/
-airflow/storage/models/
-airflow/storage/predictions/
 .env
 airflow-webserver.pid
 airflow.cfg
